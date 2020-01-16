@@ -55,10 +55,19 @@ def load_data(params):
     print("Data loading complete!")
     return train_images,train_labels,test_images,test_labels
 
+def train_model(params):
+    '''
+    Here we need to
+    :param params:
+    :return:
+    '''
+
+
+
 
 
 keras = tf.keras
 
 
 params = GetDefaultParameters()
-load_data(params)
+train_images,train_labels,test_images,test_labels = load_data(params)
