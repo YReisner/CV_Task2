@@ -55,16 +55,64 @@ def load_data(params):
     print("Data loading complete!")
     return train_images,train_labels,test_images,test_labels
 
-def train_model(params):
+def train_model(params,data,labels):
     '''
-    Here we need to
+    Here we need to train only the final layer of the ResNet50v2. You do this by stating "include_top=False" we also want
+    the weights to be trained so that would be "weights='imagenet'", we train using train_images and train_labels.
+
+    :param params:
+    :param data:
+    :param labels:
+    :return: Returns a trained Resnet50v2 model, with a new top layer
+    '''
+
+
+def test(model,data):
+    '''
+    Here we test, using model on the test data. Simply predict using the trained model.
+
+    :param model:
+    :param data:
+    :param labels:
+    :return: Returns a vector of predictions for the test data
+    '''
+
+def evaluate(predicts, probabilities, real,params):
+    '''
+    Here we evaluate the accuracy received by our model on the test set.
+
+    :param predicts:
+    :param probabilities:
+    :param real:
+    :param params:
+    :return: accuracy/error score
+    '''
+
+
+def reportResults(error,real,params):
+    '''
+    Here we report the different things we were asked. Accuracy/Error, Confusion Matrix, Worst Images? If so, we need to
+    Think if this function is the most convenient location to do so.
+
+    :param error:
+    :param real:
     :param params:
     :return:
     '''
 
 
+def validation(params,param_to_validate,possible_values):
+    '''
+    Not sure yet how this function will look like. Once we understand how the different parameters look like, we can
+    better give a pseudo code explanation of what needs to be here. Also, we might need to put the curve-recall curve
+    here, which is a type of parameter, need to make sure this function knows how to deal with it.
 
-
+    execution of the validation process
+    :param params: dictionary of parameters
+    :param param_to_validate: a hyper parameter which we want to examine
+    :param possible_values: the hyper parameter range of values we wants to examine in an iterable object
+    :return: Does not return anything
+    '''
 
 keras = tf.keras
 
