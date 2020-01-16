@@ -39,21 +39,19 @@ def load_data(params):
     train_labels = []
     test_images = []
     test_labels = []
-    for i in range(len(params["Labels"])):
+    for i in range(1,params["Labels"].size+1):
         img = params['path'] + "\\"+str(i)+".jpeg"
-        raw = cv2.imread(img)
-        im_data = np.asarray(raw)
-        sized = cv2.resize(im_data, params["image_size"])  # resizing the data
+        raw = cv2.imread(img, cv2.IMREAD_UNCHANGED)
+        sized = cv2.resize(raw, params["image_size"])  # resizing the data
         if i not in params['test_indices']:
             train_images.append(sized)
-            train_labels.append(params['Labels'][i])
+            train_labels.append(params['Labels'][0][i-1])
         else:
             test_images.append(sized)
-            test_labels.append(params['Labels'][i])
+            test_labels.append(params['Labels'][0][i-1])
     train_images = np.asarray(train_images)
-    print(train_images.shape)
-    print(len(test_images))
-    print(len(test_labels))
+    plt.imshow(train_images[54][:,:,[2,1,0]])
+    plt.show()
     print("Data loading complete!")
     return train_images,train_labels,test_images,test_labels
 
