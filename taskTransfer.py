@@ -11,11 +11,12 @@ def GetDefaultParameters():
     Create a dictionary of parameters which will be used along the process
     :return: Dictionary of parameters
     '''
-    path = r'C:\Users\BIGVU\Desktop\Yoav\University\computerVisionTask2\FlowerData'
+    path = r'D:\University\CV Task 2\FlowerData'
     test_indices = list(range(301,473))
-    labels = scipy.io.loadmat(r'C:\Users\BIGVU\Desktop\Yoav\University\computerVisionTask2\FlowerData\FlowerDataLabels.mat')["Labels"]
+    labels = scipy.io.loadmat(r'D:\University\CV Task 2\FlowerData\FlowerDataLabels.mat')["Labels"]
     image_size = (224,224)
     split = 0.2
+
     clusters = 40
     svm_c = 100
     degree = 3
@@ -50,8 +51,8 @@ def load_data(params):
             test_images.append(sized)
             test_labels.append(params['Labels'][0][i-1])
     train_images = np.asarray(train_images)
-    plt.imshow(train_images[54][:,:,[2,1,0]])
-    plt.show()
+    #plt.imshow(train_images[54][:,:,[2,1,0]])
+    #plt.show()
     print("Data loading complete!")
     return train_images,train_labels,test_images,test_labels
 
@@ -65,6 +66,87 @@ def train_model(params,data,labels):
     :param labels:
     :return: Returns a trained Resnet50v2 model, with a new top layer
     '''
+
+    base_model = keras.applications.resnet_v2.ResNet50V2(include_top = False, weights = 'imagenet', input_shape = (224,224,3)) #load the base model
+    base_model.trainable = False #Freezing the existing weights
+    data = tf.cast(data,tf.float32) # Turn the train image data to a tf object
+    labels = tf.cast(labels,tf.int8) # Same for labels
+    train = data[0:240] # Arbitrarily choose train data, with bad practice of not shuffling (80%)
+    validation = data[240:300] # rest is validation
+    train_labels = labels[0:240]
+    validation_labels = labels[240:300]
+    train = tf.data.Dataset.from_tensor_slices((train, train_labels)) # turn the data + labels to tensors we can work with
+    validation = tf.data.Dataset.from_tensor_slices((validation,validation_labels)) # same for validation
+    train_batches = train.batch(30) # We need to work with batches, otherwise memory won't take it (this is how everyone does it)
+    validation_batches = validation.batch(30) # same for validation
+    for image_batch, label_batch in train_batches.take(1): # I just need the first image data batch from train to create the layers we need
+        pass
+
+    train_features = base_model(image_batch) # create final ResNet features to jump-start the sequential layers
+
+    global_average_layer = keras.layers.GlobalAveragePooling2D() #Adding a convolutional layer to create somthing a global layer can handle
+    feature_batch_average = global_average_layer(train_features) # convolutional layer that aggregates high dimensional data to a vector
+
+    prediction_layer = keras.layers.Dense(1) # take vector and create predictions
+    prediction_batch = prediction_layer(feature_batch_average)
+
+    model = keras.Sequential([
+        base_model,
+        global_average_layer,
+        prediction_layer
+    ]) # add sequntial layers to ResNet to create the sequential model
+
+    base_learning_rate = 0.0001 # hyper parameter
+    model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=base_learning_rate),
+                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+                  metrics=['accuracy']) # define the learning parameters
+
+    print(model.summary()) # how does our sequential model looks like?
+
+    initial_epochs = 10 #number of time running over all the data in training
+    validation_steps = 2 # this is for the evaluation. If we had more data, we could raise this for better results
+
+
+    loss0, accuracy0 = model.evaluate(validation_batches,steps=validation_steps) # give the accuracy before training
+
+    print("initial loss: {:.2f}".format(loss0))
+    print("initial accuracy: {:.2f}".format(accuracy0))
+
+    history = model.fit(train_batches,
+                        epochs=initial_epochs,
+                        validation_data=validation_batches) #train the model, and retain the results at every step
+
+    # Just for printing the results, will be moved later to the proper function, I guess.
+    acc = history.history['accuracy']
+    val_acc = history.history['val_accuracy']
+
+    loss = history.history['loss']
+    val_loss = history.history['val_loss']
+    print("the loss vector is")
+    print(loss)
+    print("the validation loss is")
+    print(val_loss)
+
+    plt.figure(figsize=(8, 8))
+    plt.subplot(2, 1, 1)
+    plt.plot(acc, label='Training Accuracy')
+    plt.plot(val_acc, label='Validation Accuracy')
+    plt.legend(loc='lower right')
+    plt.ylabel('Accuracy')
+    plt.ylim([min(plt.ylim()), 1])
+    plt.title('Training and Validation Accuracy')
+
+    plt.subplot(2, 1, 2)
+    plt.plot(loss, label='Training Loss')
+    plt.plot(val_loss, label='Validation Loss')
+    plt.legend(loc='upper right')
+    plt.ylabel('Cross Entropy')
+    plt.ylim([0, 1.0])
+    plt.title('Training and Validation Loss')
+    plt.xlabel('epoch')
+    plt.show()
+
+
 
 
 def test(model,data):
@@ -119,3 +201,4 @@ keras = tf.keras
 
 params = GetDefaultParameters()
 train_images,train_labels,test_images,test_labels = load_data(params)
+train_model(params,train_images,train_labels)
