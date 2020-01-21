@@ -11,9 +11,9 @@ def GetDefaultParameters():
     Create a dictionary of parameters which will be used along the process
     :return: Dictionary of parameters
     '''
-    path = r'D:\University\CV Task 2\FlowerData'
+    path = r'C:\Users\gilei\Desktop\comp\FlowerData\FlowerData'
     test_indices = list(range(301,473))
-    labels = scipy.io.loadmat(r'D:\University\CV Task 2\FlowerData\FlowerDataLabels.mat')["Labels"]
+    labels = scipy.io.loadmat(r'C:\Users\gilei\Desktop\comp\FlowerData\FlowerDataLabels.mat')["Labels"]
     image_size = (224,224)
     split = 0.2
 
@@ -158,6 +158,38 @@ def test(model,data):
     :param labels:
     :return: Returns a vector of predictions for the test data
     '''
+    probabilities = np.array(model.predict_proba(data)) # computing the probabilities
+    predictions = np.where(probabilities > 0.5, 1, 0) #computing the predictions from the model
+    return predictions,probabilities
+
+def errors(predictions,probabilities,test_images,test_labels):
+    '''
+    finds the type1 and type 2 errors in the test data
+    :param predictions:
+    :param probabilities:
+    :param params:
+    :return: type_1: a vector of the 5 worse type 1 errors
+            type_2: a vector of the 5 worse type 2 errors
+    '''
+    type_1 = []
+    type_2 = []
+
+    for i in range(len(predictions)):
+        # miss detection - the alghorithem thought its not a flower  but it is
+        if predictions[i] == 0 and test_labels[i] == 1:
+            type_1.append(probabilities[i],i)
+
+        # false alarm - the alghorithem thought its a flower but it is not
+        if predictions[i] == 1 and test_labels[i] == 0:
+            type_2.append(probabilities[i],i)
+
+    ## subset the 5 worse errors from type 1,2
+    type_1_sorted = sorted(type_1, reverse=True, key=itemgetter(0))
+    type_2_sorted = sorted(type_2, reverse=True, key=itemgetter(0))
+    five_type_1 = type_1_sorted[0:5]
+    five_type_2 = type_2_sorted[0:5]
+    # need to save the images
+    return five_type_1, five_type_2
 
 def evaluate(predicts, probabilities, real,params):
     '''
@@ -196,9 +228,11 @@ def validation(params,param_to_validate,possible_values):
     :return: Does not return anything
     '''
 
+
 keras = tf.keras
 
 
 params = GetDefaultParameters()
 train_images,train_labels,test_images,test_labels = load_data(params)
-train_model(params,train_images,train_labels)
+model = train_model(params,train_images,train_labels)
+pred_prob, pred, score = test(model,test_images,test_labels)
