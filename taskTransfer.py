@@ -46,13 +46,15 @@ def load_data(params):
         img = params['path'] + "\\"+str(i)+".jpeg"
         raw = cv2.imread(img, cv2.IMREAD_UNCHANGED)
         sized = cv2.resize(raw, params["image_size"])  # resizing the data
+        final = sized / 255.0
         if i not in params['test_indices']:
-            train_images.append(sized)
+            train_images.append(final)
             train_labels.append(params['Labels'][0][i-1])
         else:
-            test_images.append(sized)
+            test_images.append(final)
             test_labels.append(params['Labels'][0][i-1])
     train_images = np.asarray(train_images)
+    train_labels = np.asarray(train_labels)
     #plt.imshow(train_images[54][:,:,[2,1,0]])
     #plt.show()
     print("Data loading complete!")
@@ -77,30 +79,33 @@ def train_model(params,data,labels):
     validation = data[240:300] # rest is validation
     train_labels = labels[0:240]
     validation_labels = labels[240:300]
-    train = tf.data.Dataset.from_tensor_slices((train, train_labels)) # turn the data + labels to tensors we can work with
+    '''
+    train = tf.data.Dataset.from_tensor_slices((train,train_labels)) # turn the data + labels to tensors we can work with
     validation = tf.data.Dataset.from_tensor_slices((validation,validation_labels)) # same for validation
-    train_batches = train.batch(30) # We need to work with batches, otherwise memory won't take it (this is how everyone does it)
-    validation_batches = validation.batch(30) # same for validation
+    train_batches = train.batch(30,drop_remainder=True) # We need to work with batches, otherwise memory won't take it (this is how everyone does it)
+    validation_batches = validation.batch(30,drop_remainder=True) # same for validation
     for image_batch, label_batch in train_batches.take(1): # I just need the first image data batch from train to create the layers we need
         pass
+    '''
+    train_features = base_model(train[0:30]) # create final ResNet features to jump-start the sequential layers
 
-    train_features = base_model(image_batch) # create final ResNet features to jump-start the sequential layers
-
-    global_average_layer = keras.layers.GlobalAveragePooling2D() #Adding a convolutional layer to create somthing a global layer can handle
-    feature_batch_average = global_average_layer(train_features) # convolutional layer that aggregates high dimensional data to a vector
-
+    global_max_layer = keras.layers.GlobalMaxPooling2D() #Adding a convolutional layer to create somthing a global layer can handle
+    feature_batch_average = global_max_layer(train_features) # convolutional layer that aggregates high dimensional data to a vector
+    print(feature_batch_average.shape)
     prediction_layer = keras.layers.Dense(1, activation='sigmoid') # take vector and create predictions
     prediction_batch = prediction_layer(feature_batch_average)
+    print(prediction_batch.shape)
 
     model = keras.Sequential([
         base_model,
-        global_average_layer,
+        global_max_layer,
         prediction_layer
     ]) # add sequntial layers to ResNet to create the sequential model
 
-    base_learning_rate = 0.0001 # hyper parameter
-    model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=base_learning_rate),
-                  loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
+
+    base_learning_rate = 0.001 # hyper parameter
+    model.compile(optimizer=keras.optimizers.RMSprop(lr=base_learning_rate),
+                  loss=keras.losses.BinaryCrossentropy(from_logits=True),
                   metrics=['accuracy']) # define the learning parameters
 
     print(model.summary()) # how does our sequential model looks like?
@@ -108,15 +113,14 @@ def train_model(params,data,labels):
     initial_epochs = 10 #number of time running over all the data in training
     validation_steps = 2 # this is for the evaluation. If we had more data, we could raise this for better results
 
-
-    loss0, accuracy0 = model.evaluate(validation_batches,steps=validation_steps) # give the accuracy before training
+    loss0, accuracy0 = model.evaluate(validation,validation_labels,batch_size=30,steps=validation_steps) # give the accuracy before training
 
     print("initial loss: {:.2f}".format(loss0))
     print("initial accuracy: {:.2f}".format(accuracy0))
 
-    history = model.fit(train_batches,
+    history = model.fit(train, train_labels,batch_size=30,
                         epochs=initial_epochs,
-                        validation_data=validation_batches) #train the model, and retain the results at every step
+                        validation_data=(validation,validation_labels)) #train the model, and retain the results at every step
 
     # Just for printing the results, will be moved later to the proper function, I guess.
     acc = history.history['accuracy']
