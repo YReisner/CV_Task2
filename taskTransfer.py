@@ -1,3 +1,5 @@
+from operator import itemgetter
+
 import tensorflow as tf
 import os
 import numpy as np
@@ -11,9 +13,9 @@ def GetDefaultParameters():
     Create a dictionary of parameters which will be used along the process
     :return: Dictionary of parameters
     '''
-    path = r'C:\Users\gilei\Desktop\comp\FlowerData\FlowerData'
+    path = r'D:\University\CV Task 2\FlowerData'
     test_indices = list(range(301,473))
-    labels = scipy.io.loadmat(r'C:\Users\gilei\Desktop\comp\FlowerData\FlowerDataLabels.mat')["Labels"]
+    labels = scipy.io.loadmat(path + '\FlowerDataLabels.mat')["Labels"]
     image_size = (224,224)
     split = 0.2
 
@@ -87,7 +89,7 @@ def train_model(params,data,labels):
     global_average_layer = keras.layers.GlobalAveragePooling2D() #Adding a convolutional layer to create somthing a global layer can handle
     feature_batch_average = global_average_layer(train_features) # convolutional layer that aggregates high dimensional data to a vector
 
-    prediction_layer = keras.layers.Dense(1) # take vector and create predictions
+    prediction_layer = keras.layers.Dense(1, activation='sigmoid') # take vector and create predictions
     prediction_batch = prediction_layer(feature_batch_average)
 
     model = keras.Sequential([
@@ -146,7 +148,7 @@ def train_model(params,data,labels):
     plt.xlabel('epoch')
     plt.show()
 
-
+    return model
 
 
 def test(model,data):
@@ -188,6 +190,8 @@ def errors(predictions,probabilities,test_images,test_labels):
     type_2_sorted = sorted(type_2, reverse=True, key=itemgetter(0))
     five_type_1 = type_1_sorted[0:5]
     five_type_2 = type_2_sorted[0:5]
+    print("type 1 errors")
+    print(five_type_1)
     # need to save the images
     return five_type_1, five_type_2
 
@@ -231,8 +235,8 @@ def validation(params,param_to_validate,possible_values):
 
 keras = tf.keras
 
-
+np.random.seed(42)
 params = GetDefaultParameters()
 train_images,train_labels,test_images,test_labels = load_data(params)
 model = train_model(params,train_images,train_labels)
-pred_prob, pred, score = test(model,test_images,test_labels)
+pred_prob, pred, score = test(model,test_images)
