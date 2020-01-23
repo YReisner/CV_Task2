@@ -1,5 +1,6 @@
 from operator import itemgetter
-
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_recall_curve
 import tensorflow as tf
 import os
 import numpy as np
@@ -57,6 +58,10 @@ def load_data(params):
     train_labels = np.asarray(train_labels)
     #plt.imshow(train_images[54][:,:,[2,1,0]])
     #plt.show()
+    test_images = np.asarray(test_images)
+    test_labels = np.asarray(test_labels)
+    print(test_images.shape)
+    print(test_labels.shape)
     print("Data loading complete!")
     return train_images,train_labels,test_images,test_labels
 
@@ -73,21 +78,14 @@ def train_model(params,data,labels):
 
     base_model = keras.applications.resnet_v2.ResNet50V2(include_top = False, weights = 'imagenet', input_shape = (224,224,3)) #load the base model
     base_model.trainable = False #Freezing the existing weights
-    data = tf.cast(data,tf.float32) # Turn the train image data to a tf object
-    labels = tf.cast(labels,tf.int8) # Same for labels
-    train = data[0:240] # Arbitrarily choose train data, with bad practice of not shuffling (80%)
-    validation = data[240:300] # rest is validation
-    train_labels = labels[0:240]
-    validation_labels = labels[240:300]
-    '''
-    train = tf.data.Dataset.from_tensor_slices((train,train_labels)) # turn the data + labels to tensors we can work with
-    validation = tf.data.Dataset.from_tensor_slices((validation,validation_labels)) # same for validation
-    train_batches = train.batch(30,drop_remainder=True) # We need to work with batches, otherwise memory won't take it (this is how everyone does it)
-    validation_batches = validation.batch(30,drop_remainder=True) # same for validation
-    for image_batch, label_batch in train_batches.take(1): # I just need the first image data batch from train to create the layers we need
-        pass
-    '''
-    train_features = base_model(train[0:30]) # create final ResNet features to jump-start the sequential layers
+
+    array_data = np.array(data)
+    array_labels = np.array(labels)
+    print(data.shape)
+    print(labels.shape)
+    train_x, val_x, train_y, val_y = train_test_split(array_data,array_labels,test_size=0.2,random_state=42)
+
+    train_features = base_model(train_x[0:1]) # create final ResNet features to jump-start the sequential layers
 
     global_max_layer = keras.layers.GlobalMaxPooling2D() #Adding a convolutional layer to create somthing a global layer can handle
     feature_batch_average = global_max_layer(train_features) # convolutional layer that aggregates high dimensional data to a vector
@@ -104,24 +102,26 @@ def train_model(params,data,labels):
 
 
     base_learning_rate = 0.001 # hyper parameter
-    model.compile(optimizer=keras.optimizers.RMSprop(lr=base_learning_rate),
-                  loss=keras.losses.BinaryCrossentropy(from_logits=True),
+    model.compile(optimizer=keras.optimizers.SGD(lr=base_learning_rate,momentum=0.5),
+                  loss='binary_crossentropy',
                   metrics=['accuracy']) # define the learning parameters
 
     print(model.summary()) # how does our sequential model looks like?
 
     initial_epochs = 10 #number of time running over all the data in training
     validation_steps = 2 # this is for the evaluation. If we had more data, we could raise this for better results
-
-    loss0, accuracy0 = model.evaluate(validation,validation_labels,batch_size=30,steps=validation_steps) # give the accuracy before training
+    '''
+    loss0, accuracy0 = model.evaluate(validation,validation_labels,batch_size=20,steps=validation_steps) # give the accuracy before training
 
     print("initial loss: {:.2f}".format(loss0))
     print("initial accuracy: {:.2f}".format(accuracy0))
-
-    history = model.fit(train, train_labels,batch_size=30,
+    '''
+    history = model.fit(train_x, train_y,batch_size=35,
                         epochs=initial_epochs,
-                        validation_data=(validation,validation_labels)) #train the model, and retain the results at every step
-
+                        shuffle=True,
+                        validation_data=(val_x,val_y)) #train the model, and retain the results at every step
+    print("this is the input shape")
+    print(model.input_shape)
     # Just for printing the results, will be moved later to the proper function, I guess.
     acc = history.history['accuracy']
     val_acc = history.history['val_accuracy']
@@ -164,8 +164,10 @@ def test(model,data):
     :param labels:
     :return: Returns a vector of predictions for the test data
     '''
-    probabilities = np.array(model.predict_proba(data)) # computing the probabilities
+    probabilities = np.array(model.predict_proba(data,batch_size=32,verbose=1)) # computing the probabilities
+    print(probabilities.shape)
     predictions = np.where(probabilities > 0.5, 1, 0) #computing the predictions from the model
+    print(predictions.shape)
     return predictions,probabilities
 
 def errors(predictions,probabilities,test_images,test_labels):
@@ -243,4 +245,10 @@ np.random.seed(42)
 params = GetDefaultParameters()
 train_images,train_labels,test_images,test_labels = load_data(params)
 model = train_model(params,train_images,train_labels)
-pred_prob, pred, score = test(model,test_images)
+pred_prob, pred = test(model,test_images)
+'''
+precision,recall, thresholds = precision_recall_curve(test_labels.ravel(),pred_prob.ravel())
+print(precision)
+print(recall)
+print(thresholds)
+'''
