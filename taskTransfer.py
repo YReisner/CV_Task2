@@ -152,7 +152,6 @@ def train_best_model(params,data,labels):
     model.compile(optimizer=keras.optimizers.SGD(lr=params["learning_rate"],momentum = params["momentum"]),
                   loss =params["loss"],metrics=params["metrics"]) # define the learning parameters
 
-    print(model.summary()) # how does our sequential model looks like?
     # train the model, and retain the results at every step
     history = model.fit(train_x, train_y,batch_size=params["batch_size"], epochs=params["epochs"], shuffle=True, validation_data=(val_x,val_y),verbose=2)
 
