@@ -1,23 +1,36 @@
-from operator import itemgetter
+from operator import itemgetter  # only needed for image error printing
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics import accuracy_score
-import tensorflow as tf
-import os
+import tensorflow as tf # Tensorflow 2.1 was used, sorry if that causes any issues.
 import numpy as np
 import matplotlib.pyplot as plt
-from glob import glob
 import scipy.io
 import cv2
+
+'''
+Dear user of this code,
+
+We have written this code so that the only changes that need to be made are inside the function "GetDefaultParameters" 
+just below this message. 
+Please change "data_path" to your directory of the file "FlowerData"
+Also, please change "test_indices" to the relevant indices you want to be treated as test. 
+Otherwise, nothing is supposed to be changed. 
+These changes can also be made on main, by simply redefining the dictionary values instead of simply re-assigning them. 
+Please take into consideration that if "validate" is true, a cross validation process will begin on the parameter 
+and with the values mentioned at the call to the validation function.
+
+'''
+
 
 def GetDefaultParameters():
     '''
     Create a dictionary of parameters which will be used along the process
     :return: Dictionary of parameters
     '''
-    path = r'D:\University\CV Task 2\FlowerData'
-    test_indices = list(range(301,473))
-    labels = scipy.io.loadmat(path + '\FlowerDataLabels.mat')["Labels"]
+    data_path = r'D:\University\CV Task 2\FlowerData' # change to your directory
+    test_indices = list(range(301,473)) # list of indices for test
+    labels = scipy.io.loadmat(data_path + '\FlowerDataLabels.mat')["Labels"]
     image_size = (224,224)
     split = 0.2
     input_shape = (224,224,3)
@@ -34,7 +47,7 @@ def GetDefaultParameters():
     test_batch_size = 32
     seed = 42
     decay = 0.5
-    parameters = {"path":path,"Labels":labels,"test_indices":test_indices,"validate":validate,"image_size":image_size,
+    parameters = {"path":data_path,"Labels":labels,"test_indices":test_indices,"validate":validate,"image_size":image_size,
                   "Split":split,"input_shape":input_shape, "activation":activation,"test_size":test_size,"momentum":momentum,
                   "learning_rate":learning_rate,"decay":decay,"weights":weights,"loss":loss,"metrics":metrics,"batch_size":batch_size,"epochs":epochs,"test_batch_size":test_batch_size,"seed":seed}
 
@@ -43,7 +56,7 @@ def GetDefaultParameters():
 
 def load_data(params):
     '''
-    Loads the data
+    Loads the data, pre-process it and splits into train and test according to the test indices given
     :param path: data location on the PC
     :param params: desired size measure for all images
     :return: list of images raw data and list of its labels
@@ -72,13 +85,13 @@ def load_data(params):
 
 def base_train_model(params,data,labels):
     '''
-    Here we need to train only the final layer of the ResNet50v2. You do this by stating "include_top=False" we also want
-    the weights to be trained so that would be "weights='imagenet'", we train using train_images and train_labels.
+   This is them most basic sequntial model we built over ResNet50V2, without a lot of parameters or tuning.
+   This function allows us to access our starting point at any given time if needed.
 
-    :param params:
-    :param data:
-    :param labels:
-    :return: Returns a trained Resnet50v2 model, with a new top layer
+    :param params: Default Parameters
+    :param data: Train images
+    :param labels: Train Labels
+    :return: Returns a trained sequntial Resnet50v2 model, with a new top layer
     '''
 
     base_model = keras.applications.resnet_v2.ResNet50V2(include_top = False, weights = params["weights"], input_shape =params["input_shape"] ) #load the base model
@@ -103,19 +116,18 @@ def base_train_model(params,data,labels):
     # train the model, and retain the results at every step
     history = model.fit(train_x, train_y,batch_size=32, epochs=13, shuffle=True, validation_data=(val_x,val_y),verbose=2)
 
-
+    print("Model trained!")
     return model, history.history
 
 
 def train_best_model(params,data,labels):
     '''
-    Here we need to train only the final layer of the ResNet50v2. You do this by stating "include_top=False" we also want
-    the weights to be trained so that would be "weights='imagenet'", we train using train_images and train_labels.
+   This is the training function for the best sequential model after hyper parameter turning
 
-    :param params:
-    :param data:
-    :param labels:
-    :return: Returns a trained Resnet50v2 model, with a new top layer
+    :param params: Default Parameters
+    :param data: Train Images
+    :param labels: Train Labels
+    :return: Returns a trained squential model with Resnet50v2 as basis, with new layers we train
     '''
 
     base_model = keras.applications.resnet_v2.ResNet50V2(include_top = False, weights = params["weights"], input_shape =params["input_shape"] ) #load the base model
@@ -144,30 +156,30 @@ def train_best_model(params,data,labels):
     # train the model, and retain the results at every step
     history = model.fit(train_x, train_y,batch_size=params["batch_size"], epochs=params["epochs"], shuffle=True, validation_data=(val_x,val_y),verbose=2)
 
-
+    print("Model Trained!")
     return model, history.history
-
 
 
 def test(model,data,params):
     '''
     Here we test, using model on the test data. Simply predict using the trained model.
 
-    :param model:
-    :param data:
-    :param labels:
-    :return: Returns a vector of predictions for the test data
+    :param model: The Sequential model we trained
+    :param data: Test Images
+    :return: Returns a vector of predictions (labels) and predictions (sigmoid output)  for the test data
     '''
+
     probabilities = np.array(model.predict_proba(data,batch_size=params["test_batch_size"],verbose=0)) # computing the probabilities
     predictions = np.where(probabilities > 0.5, 1, 0) #computing the predictions from the model
     return predictions,probabilities
 
+
 def precision_recall_graph(predictions, test_y):
     '''
     This function  print precision vs recall graph
-    :param predictions:
-    :param test_labels:
-    :return:
+    :param predictions: Predictions of our model on the test images
+    :param test_labels: Ground truth for test indices
+    :return: Graphs the precision recall graph
     '''
 
     preds = np.array(predictions)
@@ -182,13 +194,15 @@ def precision_recall_graph(predictions, test_y):
     plt.title('Precision VS Recall Curve')
     plt.show()
 
+    return
+
+
 def errors(test_data,predictions,probabilities,test_labels):
     '''
-     finds the type1 and type2 errors in the test data
+     finds and prints the top 5 type1 and type2 errors in the test data
     :param predictions: test predictions
     :param probabilities: test probabilities
     :param test_labels:the real labels
-    :return: top 5 errors from type1 and type2 errors and the images indices
     '''
 
     type_1 = []
@@ -227,31 +241,28 @@ def errors(test_data,predictions,probabilities,test_labels):
         plt.show()
         i += 1
 
-
-
     return
 
 
 def evaluate(predicts,real,params):
     '''
-    Here we evaluate the accuracy received by our model on the test set.
+    Here we evaluate the accuracy received by our model on the test set and print it to console.
 
-    :param predicts:
-    :param real:
-    :param params:
-    :return: accuracy/error score
+    :param predicts: Model predictions
+    :param real: Test ground truth
+    :param params: Default Parameters
     '''
+
     print("The Test Error is %f" %(1-accuracy_score(real,predicts)))
+    return
 
 
 def validation(params,param_to_validate,possible_values):
     '''
-    Not sure yet how this function will look like. Once we understand how the different parameters look like, we can
-    better give a pseudo code explanation of what needs to be here. Also, we might need to put the curve-recall curve
-    here, which is a type of parameter, need to make sure this function knows how to deal with it.
+    Hyper parameter validation process, goes over all given values (possible values), finds the best accuracy on the
+    validation set, and uses that parameter value to train a model, to evaluate on the test set.
 
-    execution of the validation process
-    :param params: dictionary of parameters
+    :param params: Default Parameters
     :param param_to_validate: a hyper parameter which we want to examine
     :param possible_values: the hyper parameter range of values we wants to examine in an iterable object
     :return: Does not return anything
@@ -291,12 +302,12 @@ def validation(params,param_to_validate,possible_values):
         evaluate(pred, test_labels, params)
 
 
-
-
-
-
-
 def display_learning(history):
+    '''
+       Displays the history of the learning process (accuracy & loss as a function of epochs)
+       :param history: dictionary containing loss & accuracy vectors for each epoch in the training process.
+       :return: Does not return anything
+       '''
     acc = history['accuracy']
     val_acc = history['val_accuracy']
 
@@ -321,20 +332,24 @@ def display_learning(history):
     plt.xlabel('epoch')
     plt.show()
 
+# Main starts here
 
-keras = tf.keras
-params = GetDefaultParameters()
+keras = tf.keras # using tensorflow as beckend for keras
+params = GetDefaultParameters() # Getting the default parameters
 
-tf.random.set_seed(params['seed'])
-np.random.seed(params['seed'])
+params['path'] = params['path'] # You can change the path here instead of inside the get function if you prefer.
+params['test_indices'] = params['test_indices'] # You can change the indices here instead of inside the get function if you prefer.
+
+tf.random.set_seed(params['seed']) # Setting the random seed for tensorflow
+np.random.seed(params['seed']) # Setting the random seed for numpy
 
 if not params['validate']:
-    train_images, train_labels, test_images, test_labels = load_data(params)
-    model, history = train_best_model(params,train_images,train_labels)
-    # display_learning(history) Plots history of learning - loss & accuracy as a function of epochs
-    pred, pred_prob = test(model,test_images,params)
-    precision_recall_graph(pred_prob, test_labels)
-    # errors(test_images,pred,pred_prob,test_labels) #shows the 5 worst errors (type 1 and type 2)
-    evaluate(pred,test_labels,params)
+    train_images, train_labels, test_images, test_labels = load_data(params) # get processed images split to train and test
+    model, history = train_best_model(params,train_images,train_labels) # Train the best model
+    #display_learning(history) # Plots history of learning - loss & accuracy as a function of epochs
+    pred, pred_prob = test(model,test_images,params) # Get predictions for the test data-set
+    precision_recall_graph(pred_prob, test_labels)  # Plot precision recall graph
+    #errors(test_images,pred,pred_prob,test_labels) #shows the 5 worst errors (type 1 and type 2)
+    evaluate(pred,test_labels,params) # Show error on test
 else:
-    model = validation(params,"learning_rate" ,(0.005,0.01,0.05,0.1,0.5))
+    model = validation(params,"learning_rate" ,(0.005,0.01,0.05,0.1,0.5)) # Hyper validation process
